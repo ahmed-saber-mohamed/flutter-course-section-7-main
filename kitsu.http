@@ -1,0 +1,253 @@
+# ==================================================================
+#  Kitsu API: GET requests to explore with the VS Code REST Client
+# ==================================================================
+#  How to use:
+#   1. Install the "REST Client" extension in VS Code.
+#   2. Click "Send Request" above any request.
+#   3. Read the response: status code, headers, and body.
+#
+#  Requests are separated by ###
+#  Kitsu docs: https://kitsu.docs.apiary.io/
+# ==================================================================
+
+@base = https://kitsu.app/api/edge
+
+
+# ==================================================================
+#  PART 1: Headers
+#  Kitsu speaks JSON:API, so its format is application/vnd.api+json
+# ==================================================================
+
+### 1.1 The correct Accept header (this is what our app sends)
+GET {{base}}/anime
+Accept: application/vnd.api+json
+
+
+### 1.2 No Accept header at all
+#   Still 200! The server uses its default format.
+#   Look at the Content-Type header in the response.
+GET {{base}}/anime
+
+
+### 1.3 The WRONG Accept header
+#   We ask for plain JSON, but Kitsu only gives JSON:API.
+#   Result: 406 Not Acceptable
+GET {{base}}/anime
+Accept: application/json
+
+
+# ==================================================================
+#  PART 2: Pagination
+#  Kitsu sends 10 items per page by default, and 20 at most.
+#  Look at "meta.count" (total items) and "links.next" (next page).
+# ==================================================================
+
+### 2.1 First page (items 1 to 10)
+GET {{base}}/anime
+Accept: application/vnd.api+json
+
+
+### 2.2 Second page: skip the first 10 (this is what our scroll does)
+GET {{base}}/anime?page[offset]=10
+Accept: application/vnd.api+json
+
+
+### 2.3 Bigger pages: 20 items per page (the maximum)
+GET {{base}}/anime?page[limit]=20&page[offset]=0
+Accept: application/vnd.api+json
+
+
+### 2.4 More than the maximum
+#   Result: 400 "Limit exceeds maximum page size of 20."
+GET {{base}}/anime?page[limit]=25
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 3: Ask only for the data you need (sparse fieldsets)
+#  Each anime has more than 30 attributes, but our app uses 4.
+#  fields[anime]=... tells the server which ones to send.
+# ==================================================================
+
+### 3.1 Everything (about 60 KB for 10 anime)
+GET {{base}}/anime
+Accept: application/vnd.api+json
+
+
+### 3.2 Only the 4 fields our app uses (about 15 KB: 4x smaller!)
+GET {{base}}/anime?fields[anime]=slug,description,averageRating,posterImage
+Accept: application/vnd.api+json
+
+
+### 3.3 Only the title and the rating
+GET {{base}}/anime?fields[anime]=canonicalTitle,averageRating
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 4: Sorting
+#  sort=field    → ascending  (small to big)
+#  sort=-field   → descending (big to small), note the minus sign
+# ==================================================================
+
+### 4.1 Highest rated first
+GET {{base}}/anime?sort=-averageRating&fields[anime]=canonicalTitle,averageRating
+Accept: application/vnd.api+json
+
+
+### 4.2 Most popular first (rank 1 is the most popular)
+GET {{base}}/anime?sort=popularityRank&fields[anime]=canonicalTitle,popularityRank
+Accept: application/vnd.api+json
+
+
+### 4.3 Newest first
+GET {{base}}/anime?sort=-startDate&fields[anime]=canonicalTitle,startDate
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 5: Filtering
+#  filter[name]=value  → only items that match
+#  Look at "meta.count": how many items matched?
+# ==================================================================
+
+### 5.1 Search by text
+GET {{base}}/anime?filter[text]=naruto&fields[anime]=canonicalTitle
+Accept: application/vnd.api+json
+
+
+### 5.2 Exact match by slug
+GET {{base}}/anime?filter[slug]=cowboy-bebop
+Accept: application/vnd.api+json
+
+
+### 5.3 By type: TV, movie, OVA, ONA, special, music
+GET {{base}}/anime?filter[subtype]=movie&fields[anime]=canonicalTitle,subtype
+Accept: application/vnd.api+json
+
+
+### 5.4 By status: current (airing now), finished, upcoming
+GET {{base}}/anime?filter[status]=current&fields[anime]=canonicalTitle,status
+Accept: application/vnd.api+json
+
+
+### 5.5 By age rating: G, PG, R
+GET {{base}}/anime?filter[ageRating]=G&fields[anime]=canonicalTitle,ageRating
+Accept: application/vnd.api+json
+
+
+### 5.6 By year
+GET {{base}}/anime?filter[seasonYear]=2020&fields[anime]=canonicalTitle,startDate
+Accept: application/vnd.api+json
+
+
+### 5.7 By category
+GET {{base}}/anime?filter[categories]=adventure&fields[anime]=canonicalTitle
+Accept: application/vnd.api+json
+
+
+### 5.8 Put it all together: best TV anime of 2020, 5 per page
+#   A long query can be split over several lines (start with ? then &)
+GET {{base}}/anime
+    ?filter[seasonYear]=2020
+    &filter[subtype]=TV
+    &sort=-averageRating
+    &page[limit]=5
+    &fields[anime]=canonicalTitle,averageRating,startDate
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 6: One anime by id
+#  The URL has an id at the end, and "data" is an OBJECT, not a list
+# ==================================================================
+
+### 6.1 One anime
+GET {{base}}/anime/1
+Accept: application/vnd.api+json
+
+
+### 6.2 One anime, only some fields
+GET {{base}}/anime/1?fields[anime]=canonicalTitle,synopsis,episodeCount
+Accept: application/vnd.api+json
+
+
+### 6.3 An id that does not exist
+#   Result: 404 "Record not found"
+GET {{base}}/anime/999999999
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 7: Related data
+#  An anime is connected to other resources: episodes, categories...
+#  Look at "relationships" in the response of 6.1
+# ==================================================================
+
+### 7.1 The episodes of an anime
+GET {{base}}/anime/1/episodes?fields[episodes]=number,canonicalTitle
+Accept: application/vnd.api+json
+
+
+### 7.2 The categories of an anime
+GET {{base}}/anime/1/categories?fields[categories]=title
+Accept: application/vnd.api+json
+
+
+### 7.3 The anime AND its categories in ONE request
+#   include=... adds the related items in "included" at the end of the response
+GET {{base}}/anime/1?include=categories&fields[categories]=title
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 8: Other endpoints
+# ==================================================================
+
+### 8.1 Trending anime this week
+GET {{base}}/trending/anime
+Accept: application/vnd.api+json
+
+
+### 8.2 All categories, the biggest first
+GET {{base}}/categories?sort=-totalMediaCount&fields[categories]=title,totalMediaCount
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 9: Errors
+#  Read the status code AND the "errors" array in the body:
+#  a real API tells you exactly what you did wrong.
+# ==================================================================
+
+### 9.1 A path that does not exist → 404
+GET {{base}}/animee
+Accept: application/vnd.api+json
+
+
+### 9.2 A filter that does not exist → 400 "Filter not allowed"
+GET {{base}}/anime?filter[banana]=1
+Accept: application/vnd.api+json
+
+
+### 9.3 A sort that does not exist → 400 "Invalid sort criteria"
+GET {{base}}/anime?sort=banana
+Accept: application/vnd.api+json
+
+
+### 9.4 The old domain. Kitsu moved from kitsu.io to kitsu.app.
+#   It still answers today, but real APIs move: always use the address in the docs.
+GET https://kitsu.io/api/edge/anime
+Accept: application/vnd.api+json
+
+
+# ==================================================================
+#  PART 10: Real data is not perfect (keep this in mind!)
+#  A real API can send null for a value you expected to always exist.
+# ==================================================================
+
+### 10.1 Upcoming anime: nobody has rated them yet
+#   Look at "averageRating" in each item. What is its value?
+#   What would Anime.fromJson do with it?
+GET {{base}}/anime?filter[status]=upcoming&fields[anime]=slug,description,averageRating,posterImage
+Accept: application/vnd.api+json
